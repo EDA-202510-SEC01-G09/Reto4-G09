@@ -1,12 +1,18 @@
 import sys
-
+from App import logic as lg
+from DataStructures.List import array_list as ar
+from DataStructures.Map import map_linear_probing as lp
+from DataStructures.Tree import red_black_tree as rbt
+import tabulate as tb
+import csv  
+from DataStructures.List import array_list as ar
 
 def new_logic():
     """
         Se crea una instancia del controlador
     """
     #TODO: Llamar la función de la lógica donde se crean las estructuras de datos
-    pass
+    return lg.new_logic()
 
 def print_menu():
     print("Bienvenido")
@@ -26,7 +32,20 @@ def load_data(control):
     Carga los datos
     """
     #TODO: Realizar la carga de datos
-    pass
+
+    file = input("Ingrese el nombre del archivo a cargar: ")
+    file_path = f"Data/Crime_in_LA/Crime_in_LA_{file}.csv" 
+
+    data = lg.load_data(control, file_path)
+    headers_generales = ["Tiempo de carga", "N° de registros"]
+    print(tb.tabulate([data[0]["elements"]], headers_generales, tablefmt="pretty"))    
+    print(f"\nLos primeros 5 registros son:\n")
+    primeros = data[1]["elements"]
+    headers = ["DR_NO", "Date Rptd", "DATE OCC", "AREA NAME", "Crm Cd"]  
+    print(tb.tabulate(primeros, headers, tablefmt="pretty"))
+    print(f"\nLos últimos 5 registros son:\n")
+    primeros = data[2]["elements"] 
+    print(tb.tabulate(primeros, headers, tablefmt="pretty"))
 
 
 def print_data(control, id):

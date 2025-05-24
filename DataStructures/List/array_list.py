@@ -7,18 +7,11 @@ def new_list():
 def get_element(my_list, index):
     return my_list["elements"][index]
 
-def is_present(my_list, element, cmp_function):
-    size = my_list["size"]
-    if size > 0:
-        keyexist = False
-        for keypos in range(0, size):
-            info = my_list["elements"][keypos]
-            if cmp_function(element, info) == 0:
-                keyexist = True
-                break
-        if keyexist:
-            return keypos
-    return -1
+def is_present(my_list, element):
+    for i in my_list["elements"]:
+        if i == element:
+            return True
+    return False
 
 def add_first(my_list, element):
     my_list["elements"].insert(0, element)

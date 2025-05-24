@@ -4,6 +4,8 @@ from DataStructures.Map import map_linear_probing as lp
 from DataStructures.Priority_queue import priority_queue as pq
 from DataStructures.Graph import bfs
 from DataStructures.Graph import dfs
+from App import logic as lg
+from DataStructures.List import array_list as ar
 def test():
 
     grafo = gr.new_graph(5)
@@ -33,8 +35,13 @@ def test():
     gr.add_edge(grafo, 5, 2, 1)
     gr.add_edge(grafo, 5, 6, 13)
 
-    visited_dfs = dfs.dfs(grafo, 0)
-    print(dfs.path_to(7, visited_dfs))
+    lista = ar.new_list()
+    ar.add_last(lista, 1)
+    ar.add_last(lista, 2)
+    ar.add_last(lista, 3)
+    ar.add_last(lista, 4)
+    ar.add_last(lista, 5)
+    print(ar.get_element(lista, 0))
 
     pass
 
