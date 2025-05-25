@@ -4,31 +4,30 @@ from DataStructures.Graph import digraph as gr
 from DataStructures.Map import map_linear_probing as mp
 from DataStructures.List import array_list as lt
 from DataStructures.Stack import stack as st
+from DataStructures.Graph import edge as edg
 
 def new_logic():
-    """
-    Crea el catalogo para almacenar las estructuras de datos
-    """
-    #TODO: Llama a las funciónes de creación de las estructuras de datos
-    
-
     """
     Crea el catálogo para almacenar las estructuras de datos principales.
     """
     catalog = {
-        "graph": gr.new_graph(100000),  # Asumiendo que tienes un módulo de grafos
-        "delivery_person_history": mp.new_map(100000, 0.5),  # delivery_person_id -> list of (order, origin, destination, time)
-        "edges_info": mp.new_map(100000, 0.5)  # (node1, node2) -> list of times (for averaging)
+        # Grafo principal, donde cada nodo tendrá un mapa propio de domiciliarios
+        "graph": gr.new_graph(100000),
+        # Mapa para la historia de cada domiciliario (stack de entregas)
+        "delivery_person_history": mp.new_map(100000, 0.5),
+        # Mapa para acumular tiempos y conteos de cada arista
+        "edges_info": mp.new_map(100000, 0.5)
     }
     return catalog
 
 def format_node_id(lat, lon):
+    # Formatea la latitud y longitud a 4 decimales y los une con "_"
     return f"{float(lat):.4f}_{float(lon):.4f}"
 
 def load_data(catalog, filename):
     """
     Carga los datos del reto y construye el grafo y las estructuras auxiliares.
-    Optimizada: solo usa tus estructuras propias.
+    Usa un mapa propio para los domiciliarios por nodo para máxima eficiencia.
     """
     start_time = get_time()
     with open(filename, encoding="utf-8") as file:
@@ -40,18 +39,18 @@ def load_data(catalog, filename):
             origin = format_node_id(row["Restaurant_latitude"], row["Restaurant_longitude"])
             destination = format_node_id(row["Delivery_location_latitude"], row["Delivery_location_longitude"])
 
-            # Si el nodo no existe en el grafo, lo creo con una lista de domiciliarios
+            # Si el nodo no existe en el grafo, lo creo con un mapa de domiciliarios
             for node in [origin, destination]:
                 if not gr.contains_vertex(catalog["graph"], node):
-                    info = {"delivery_persons": lt.new_list()}
+                    info = {"delivery_persons": mp.new_map(100, 0.5)}
                     gr.insert_vertex(catalog["graph"], node, info)
 
-            # Agrego el domiciliario a la lista del nodo si no está presente
+            # Agrego el domiciliario al mapa del nodo si no está presente (O(1) promedio)
             for node in [origin, destination]:
                 node_info = gr.get_vertex_information(catalog["graph"], node)
-                delivery_list = node_info["delivery_persons"]
-                if not lt.is_present(delivery_list, delivery_person_id):
-                    lt.add_last(delivery_list, delivery_person_id)
+                delivery_map = node_info["delivery_persons"]
+                if not mp.contains(delivery_map, delivery_person_id):
+                    mp.put(delivery_map, delivery_person_id, True)
 
             # Genero la clave única para la arista (no dirigida)
             if origin < destination:
@@ -120,20 +119,109 @@ def get_data(catalog, id):
     pass
 
 
-def req_1(catalog):
+def req_1(catalog, origen, destino):
     """
     Retorna el resultado del requerimiento 1
     """
     # TODO: Modificar el requerimiento 1
     pass
 
+    """
+    Retorna el camino de menor tiempo entre dos ubicaciones geográficas.
+    Usa Dijkstra sobre el grafo principal.
+    """
+    graph = catalog["graph"]
+    # Diccionario para almacenar el costo mínimo a cada nodo
+    dist = {}
+    # Diccionario para reconstruir el camino
+    prev = {}
+    # Lista de nodos por visitar (tupla: (costo acumulado, nodo))
+    import heapq
+    heap = []
 
-def req_2(catalog):
+    # Inicializo todas las distancias en infinito, excepto el origen
+    vertices = gr.vertices(graph)
+    for i in range(lt.size(vertices)):
+        node = lt.get_element(vertices, i)
+        dist[node] = float('inf')
+        prev[node] = None
+    dist[origen] = 0
+    heapq.heappush(heap, (0, origen))
+
+    while heap:
+        costo_actual, actual = heapq.heappop(heap)
+        if actual == destino:
+            break
+        adyacentes = gr.adjacents(graph, actual)
+        adj_keys = mp.key_set(adyacentes)
+        for j in range(lt.size(adj_keys)):
+            vecino = lt.get_element(adj_keys, j)
+            edge = mp.get(adyacentes, vecino)
+            peso = edg.get_weight(edge)
+            nuevo_costo = costo_actual + peso
+            if nuevo_costo < dist[vecino]:
+                dist[vecino] = nuevo_costo
+                prev[vecino] = actual
+                heapq.heappush(heap, (nuevo_costo, vecino))
+
+    # Reconstruyo el camino
+    camino = []
+    actual = destino
+    while actual is not None:
+        camino.insert(0, actual)
+        actual = prev[actual]
+    if dist[destino] == float('inf'):
+        return None, float('inf')  # No hay camino
+    return camino, dist[destino]
+
+def req_2(catalog, origen, destino, delivery_person_id):
     """
     Retorna el resultado del requerimiento 2
     """
     # TODO: Modificar el requerimiento 2
     pass
+
+
+    """
+    Retorna el camino con menos puntos intermedios entre dos ubicaciones
+    para un domiciliario específico (solo por nodos donde ese domiciliario estuvo).
+    """
+    graph = catalog["graph"]
+    from collections import deque
+
+    # BFS clásico pero solo por nodos donde el domiciliario estuvo
+    visitados = {}
+    prev = {}
+    queue = deque()
+    queue.append(origen)
+    visitados[origen] = True
+    prev[origen] = None
+
+    while queue:
+        actual = queue.popleft()
+        if actual == destino:
+            break
+        adyacentes = gr.adjacents(graph, actual)
+        adj_keys = mp.key_set(adyacentes)
+        for j in range(lt.size(adj_keys)):
+            vecino = lt.get_element(adj_keys, j)
+            # Solo avanzar si el domiciliario estuvo en el nodo vecino
+            node_info = gr.get_vertex_information(graph, vecino)
+            delivery_map = node_info["delivery_persons"]
+            if mp.contains(delivery_map, delivery_person_id) and vecino not in visitados:
+                visitados[vecino] = True
+                prev[vecino] = actual
+                queue.append(vecino)
+
+    # Reconstruyo el camino
+    camino = []
+    actual = destino
+    while actual is not None and actual in prev:
+        camino.insert(0, actual)
+        actual = prev[actual]
+    if not camino or camino[0] != origen:
+        return None  # No hay camino válido
+    return camino
 
 
 def req_3(catalog):
