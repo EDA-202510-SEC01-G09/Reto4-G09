@@ -27,17 +27,44 @@ def format_node_id(lat, lon):
 def load_data(catalog, filename):
     """
     Carga los datos del reto y construye el grafo y las estructuras auxiliares.
-    Usa un mapa propio para los domiciliarios por nodo para máxima eficiencia.
+    Retorna una matriz (lista de listas nativa) con los datos solicitados para el reporte.
     """
+    # Inicializo contadores y estructuras auxiliares propias
+    total_domicilios = 0
+    total_tiempo = 0.0
+
+    # Mapa para restaurantes únicos (orígenes)
+    restaurantes = mp.new_map(100000, 0.5)
+    # Mapa para ubicaciones de destino únicas
+    destinos = mp.new_map(100000, 0.5)
+    # Mapa para domiciliarios únicos
+    domiciliarios = mp.new_map(100000, 0.5)
+
     start_time = get_time()
     with open(filename, encoding="utf-8") as file:
         reader = csv.DictReader(file)
         for row in reader:
+            total_domicilios += 1
             order_id = row["ID"]
             delivery_person_id = row["Delivery_person_ID"]
             time_taken = float(row["Time_taken"])
             origin = format_node_id(row["Restaurant_latitude"], row["Restaurant_longitude"])
             destination = format_node_id(row["Delivery_location_latitude"], row["Delivery_location_longitude"])
+
+            # Registro de domiciliarios únicos
+            if not mp.contains(domiciliarios, delivery_person_id):
+                mp.put(domiciliarios, delivery_person_id, True)
+
+            # Registro de restaurantes únicos (orígenes)
+            if not mp.contains(restaurantes, origin):
+                mp.put(restaurantes, origin, True)
+
+            # Registro de destinos únicos
+            if not mp.contains(destinos, destination):
+                mp.put(destinos, destination, True)
+
+            # Sumo el tiempo total para el promedio
+            total_tiempo += time_taken
 
             # Si el nodo no existe en el grafo, lo creo con un mapa de domiciliarios
             for node in [origin, destination]:
@@ -45,7 +72,7 @@ def load_data(catalog, filename):
                     info = {"delivery_persons": mp.new_map(100, 0.5)}
                     gr.insert_vertex(catalog["graph"], node, info)
 
-            # Agrego el domiciliario al mapa del nodo si no está presente (O(1) promedio)
+            # Agrego el domiciliario al mapa del nodo si no está presente
             for node in [origin, destination]:
                 node_info = gr.get_vertex_information(catalog["graph"], node)
                 delivery_map = node_info["delivery_persons"]
@@ -96,7 +123,6 @@ def load_data(catalog, filename):
 
     # Al final, agrego las aristas al grafo con el tiempo promedio calculado
     edge_keys = mp.key_set(catalog["edges_info"])
-    print(lt.size(edge_keys))
     for i in range(lt.size(edge_keys)):
         edge_key = lt.get_element(edge_keys, i)
         edge_info = mp.get(catalog["edges_info"], edge_key)
@@ -106,9 +132,19 @@ def load_data(catalog, filename):
 
     end_time = get_time()
     elapsed_time = delta_time(start_time, end_time)
-    print(f"Datos cargados en {elapsed_time:.2f} ms")
 
+    # Construyo la matriz de resultados como lista de listas nativa de Python
+    matriz = []
+    matriz.append(["Total domicilios procesados", total_domicilios])
+    matriz.append(["Total domiciliarios identificados", mp.size(domiciliarios)])
+    matriz.append(["Total nodos en el grafo", gr.order(catalog["graph"])])
+    matriz.append(["Total arcos en el grafo", lt.size(edge_keys)])
+    matriz.append(["Total restaurantes únicos", mp.size(restaurantes)])
+    matriz.append(["Total ubicaciones destino únicas", mp.size(destinos)])
+    promedio_tiempo = total_tiempo / total_domicilios if total_domicilios > 0 else 0
+    matriz.append(["Promedio tiempo de entrega", promedio_tiempo])
 
+    return matriz, elapsed_time
 # Funciones de consulta sobre el catálogo
 
 def get_data(catalog, id):

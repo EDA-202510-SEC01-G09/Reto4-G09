@@ -29,14 +29,16 @@ def print_menu():
 
 def load_data(control):
     """
-    Carga los datos
+    Carga los datos y muestra el resumen tabulado.
     """
-    #TODO: Realizar la carga de datos
-
     file = input("Ingrese el nombre del archivo a cargar: ")
     file_path = f"Data/deliverytime_{file}.csv" 
 
+    # Llama a la lógica y obtiene la matriz de resumen
     data = lg.load_data(control, file_path)
+    print(data)
+
+
 
 
 

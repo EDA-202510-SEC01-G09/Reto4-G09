@@ -38,41 +38,54 @@ def put(my_map, key, value):
     return my_map
 
 def contains(my_map, key):
-    
-     for i in my_map["table"]["elements"]:
-          if me.get_key(i) == key:
-               return True
-          
-     return False
+    hash_value = mf.hash_value(my_map, key)
+    capacity = my_map["capacity"]
+    for _ in range(capacity):
+        entry = lt.get_element(my_map["table"], hash_value)
+        entry_key = me.get_key(entry)
+        if entry_key is None:
+            return False
+        if entry_key != "__EMPTY__" and entry_key == key:
+            return True
+        hash_value = (hash_value + 1) % capacity
+    return False
 
 def get(my_map, key):
-     
-     for i in my_map["table"]["elements"]:
-         if me.get_key(i) == key:
-             return me.get_value(i)
+    hash_value = mf.hash_value(my_map, key)
+    capacity = my_map["capacity"]
+    for _ in range(capacity):
+        entry = lt.get_element(my_map["table"], hash_value)
+        entry_key = me.get_key(entry)
+        if entry_key is None:
+            return None  # No está la clave
+        if entry_key != "__EMPTY__" and entry_key == key:
+            return me.get_value(entry)
+        hash_value = (hash_value + 1) % capacity
+    return None
 
-     return None
+
 
 def remove(my_map, key):
-    
-     for i in my_map["table"]["elements"]:
-         if me.get_key(i) == key:
-             me.set_key(i, "__EMPTY__")
-             me.set_value(i, "__EMPTY__")
-             my_map["size"] -= 1
-             return my_map
-         
-     return my_map
+    hash_value = mf.hash_value(my_map, key)
+    capacity = my_map["capacity"]
+    for _ in range(capacity):
+        entry = lt.get_element(my_map["table"], hash_value)
+        entry_key = me.get_key(entry)
+        if entry_key is None:
+            return my_map  # No está la clave
+        if entry_key != "__EMPTY__" and entry_key == key:
+            me.set_key(entry, "__EMPTY__")
+            me.set_value(entry, "__EMPTY__")
+            my_map["size"] -= 1
+            return my_map
+        hash_value = (hash_value + 1) % capacity
+    return my_map
 
 def size(my_map):
     return my_map["size"]
 
 def is_empty(my_map):
-
-     for i in my_map["table"]["elements"]:
-          if (me.get_key(i) is not None) and (me.get_key(i) != "__EMPTY__"): 
-               return False            
-     return True
+    return my_map["size"] == 0
 
 def key_set (my_map):
      result = lt.new_list() 

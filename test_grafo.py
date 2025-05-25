@@ -8,7 +8,7 @@ from App import logic as lg
 from DataStructures.List import array_list as ar
 def test():
 
-    grafo = gr.new_graph(5)
+    grafo = gr.new_graph(500000)
     gr.insert_vertex(grafo, 0, "A")
     gr.insert_vertex(grafo, 1, "B")
     gr.insert_vertex(grafo, 2, "C")
@@ -35,12 +35,8 @@ def test():
     gr.add_edge(grafo, 5, 2, 1)
     gr.add_edge(grafo, 5, 6, 13)
 
-    lista = ar.new_list()
-    ar.add_last(lista, 1)
-    ar.add_last(lista, 2)
-    ar.add_last(lista, 3)
-    ar.add_last(lista, 4)
-    ar.add_last(lista, 5)
+    print(gr.order(grafo))
+
     
 
 
