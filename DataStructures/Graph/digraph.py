@@ -38,6 +38,7 @@ def add_edge(my_graph, key_u, key_v, weight=1.0):
         raise Exception("El vertice v no existe")
     else:
         ve.add_adjacent(vertex_u, key_v, weight)
+        ve.add_adjacent(vertex_v, key_u, weight)
 
         my_graph["num_edges"] += 1
         return my_graph

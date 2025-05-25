@@ -34,18 +34,10 @@ def load_data(control):
     #TODO: Realizar la carga de datos
 
     file = input("Ingrese el nombre del archivo a cargar: ")
-    file_path = f"Data/Crime_in_LA/Crime_in_LA_{file}.csv" 
+    file_path = f"Data/deliverytime_{file}.csv" 
 
     data = lg.load_data(control, file_path)
-    headers_generales = ["Tiempo de carga", "N° de registros"]
-    print(tb.tabulate([data[0]["elements"]], headers_generales, tablefmt="pretty"))    
-    print(f"\nLos primeros 5 registros son:\n")
-    primeros = data[1]["elements"]
-    headers = ["DR_NO", "Date Rptd", "DATE OCC", "AREA NAME", "Crm Cd"]  
-    print(tb.tabulate(primeros, headers, tablefmt="pretty"))
-    print(f"\nLos últimos 5 registros son:\n")
-    primeros = data[2]["elements"] 
-    print(tb.tabulate(primeros, headers, tablefmt="pretty"))
+
 
 
 def print_data(control, id):

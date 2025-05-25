@@ -41,7 +41,8 @@ def test():
     ar.add_last(lista, 3)
     ar.add_last(lista, 4)
     ar.add_last(lista, 5)
-    print(ar.get_element(lista, 0))
+    
+
 
     pass
 

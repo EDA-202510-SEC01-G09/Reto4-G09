@@ -16,10 +16,9 @@ def new_logic():
     Crea el catálogo para almacenar las estructuras de datos principales.
     """
     catalog = {
-        "graph": gr.new_graph(directed=False),  # Asumiendo que tienes un módulo de grafos
-        "node_delivery_persons": mp.new_map(),  # node_id -> set of delivery person IDs
-        "delivery_person_history": mp.new_map(),  # delivery_person_id -> list of (order, origin, destination, time)
-        "edges_info": mp.new_map()  # (node1, node2) -> list of times (for averaging)
+        "graph": gr.new_graph(100000),  # Asumiendo que tienes un módulo de grafos
+        "delivery_person_history": mp.new_map(100000, 0.5),  # delivery_person_id -> list of (order, origin, destination, time)
+        "edges_info": mp.new_map(100000, 0.5)  # (node1, node2) -> list of times (for averaging)
     }
     return catalog
 
@@ -28,90 +27,67 @@ def format_node_id(lat, lon):
 
 def load_data(catalog, filename):
     """
-    Carga los datos del reto
+    Carga los datos del reto y construye el grafo y las estructuras auxiliares.
+    Optimizada: solo usa tus estructuras propias.
     """
-    # TODO: Realizar la carga de datos
-    pass
-
-    # Abrir el archivo CSV
-
+    start_time = get_time()
     with open(filename, encoding="utf-8") as file:
         reader = csv.DictReader(file)
         for row in reader:
-            # 1. Extraer los datos relevantes de la fila
             order_id = row["ID"]
             delivery_person_id = row["Delivery_person_ID"]
             time_taken = float(row["Time_taken"])
             origin = format_node_id(row["Restaurant_latitude"], row["Restaurant_longitude"])
             destination = format_node_id(row["Delivery_location_latitude"], row["Delivery_location_longitude"])
 
-            # 2. Insertar nodos en el grafo si no existen
-            if not gr.contains_vertex(catalog["graph"], origin):
-
-                gr.insert_vertex(catalog["graph"], origin)
-                # Crear lista de domiciliarios para el nodo origen
-                mp.put(catalog["node_delivery_persons"], origin, lt.new_list())
-
-            if not gr.contains_vertex(catalog["graph"], destination):
-                gr.insert_vertex(catalog["graph"], destination)
-                # Crear lista de domiciliarios para el nodo destino
-                mp.put(catalog["node_delivery_persons"], destination, lt.new_list())
-
-            # 3. Agregar el domiciliario a la lista de cada nodo (si no está ya)
+            # Si el nodo no existe en el grafo, lo creo con una lista de domiciliarios
             for node in [origin, destination]:
-                delivery_list = mp.get(catalog["node_delivery_persons"], node)
+                if not gr.contains_vertex(catalog["graph"], node):
+                    info = {"delivery_persons": lt.new_list()}
+                    gr.insert_vertex(catalog["graph"], node, info)
+
+            # Agrego el domiciliario a la lista del nodo si no está presente
+            for node in [origin, destination]:
+                node_info = gr.get_vertex_information(catalog["graph"], node)
+                delivery_list = node_info["delivery_persons"]
                 if not lt.is_present(delivery_list, delivery_person_id):
                     lt.add_last(delivery_list, delivery_person_id)
 
-            # Ordena las localizaciones para evitar duplicados
-            # mete tiempos a determinado edge para hacer los promedios
+            # Genero la clave única para la arista (no dirigida)
             if origin < destination:
                 edge_key = origin + "|" + destination
             else:
                 edge_key = destination + "|" + origin
 
+            # Acumulo el tiempo y el conteo para calcular el promedio después
             if not mp.contains(catalog["edges_info"], edge_key):
-                mp.put(catalog["edges_info"], edge_key, lt.new_list())
-            time_list = mp.get(catalog["edges_info"], edge_key)
-            lt.add_last(time_list, time_taken)
+                mp.put(catalog["edges_info"], edge_key, {"total": 0, "count": 0})
+            edge_info = mp.get(catalog["edges_info"], edge_key)
+            edge_info["total"] += time_taken
+            edge_info["count"] += 1
 
-            # 5. Manejar la historia del domiciliario para crear arista entre destinos consecutivos
+            # Manejo la historia del domiciliario para crear arista entre destinos consecutivos
             if not mp.contains(catalog["delivery_person_history"], delivery_person_id):
                 mp.put(catalog["delivery_person_history"], delivery_person_id, st.new_stack())
             history = mp.get(catalog["delivery_person_history"], delivery_person_id)
 
-            # Si la historia del domiciliario NO está vacía (es decir, ya hizo entregas antes)
             if not st.is_empty(history):
-                # Obtener la última entrega realizada por este domiciliario (sin removerla del stack)
                 prev = st.top(history)
-                prev_dest = prev["destination"]      # Nodo destino de la entrega anterior
-                prev_time = prev["time_taken"]       # Tiempo de la entrega anterior
-
-                # Crear una arista entre el destino anterior y el destino actual
-                # Se ordenan los nodos para evitar duplicados en el grafo no dirigido
-                # Asumo que el orden en el que llegan los pedidos es el el orden en el que se hciieron
-                # Hacer comparaciones mediante latitudes a ver cual es mas lejano resulta subjetivo
+                prev_dest = prev["destination"]
+                prev_time = prev["time_taken"]
+                # Genero la clave única para la arista entre destinos consecutivos
                 if prev_dest < destination:
                     prev_edge_key = prev_dest + "|" + destination
                 else:
                     prev_edge_key = destination + "|" + prev_dest
-
-                # Si la arista aún no existe en el registro de tiempos, se crea una nueva lista de tiempos
                 if not mp.contains(catalog["edges_info"], prev_edge_key):
-                    mp.put(catalog["edges_info"], prev_edge_key, lt.new_list())
-
-                # Obtener la lista de tiempos asociada a esta arista
-                prev_time_list = mp.get(catalog["edges_info"], prev_edge_key)
-
-                # Calcular el tiempo promedio entre la entrega anterior y la actual
+                    mp.put(catalog["edges_info"], prev_edge_key, {"total": 0, "count": 0})
+                prev_edge_info = mp.get(catalog["edges_info"], prev_edge_key)
                 avg_time = (prev_time + time_taken) / 2
-                # La razón por la que se promedia solo entre la entrega anterior y la actual 
-                # (y no se espera a más entregas) es porque cada arista entre dos destinos consecutivos 
-                # de un domiciliario representa únicamente ese par de entregas.
-                #No se espera que haya más entregas entre esos dos mismos destinos consecutivos para ese domiciliario,
-                # Agregar este tiempo promedio a la lista de tiempos de la arista
-                lt.add_last(prev_time_list, avg_time)
-            # Guardar el domicilio actual en la historia del domiciliario (push al stack)
+                prev_edge_info["total"] += avg_time
+                prev_edge_info["count"] += 1
+
+            # Guardo el domicilio actual en la historia del domiciliario (push al stack)
             st.push(history, {
                 "order_id": order_id,
                 "origin": origin,
@@ -119,22 +95,19 @@ def load_data(catalog, filename):
                 "time_taken": time_taken
             })
 
-    # 6. Al final, agregar las aristas al grafo con el tiempo promedio
-    # Obtener la lista de claves de aristas
+    # Al final, agrego las aristas al grafo con el tiempo promedio calculado
     edge_keys = mp.key_set(catalog["edges_info"])
-    num_edges = lt.size(edge_keys)
-
-    for edge in edge_keys["elements"]:
-        edge_key = edge["key"]
-        time_list = mp.get(catalog["edges_info"], edge_key)
-        total = 0
-        count = lt.size(time_list)
-        for j in range(0, count):
-            total += lt.get_element(time_list, j)
-        avg_time = total / count if count > 0 else 0
+    print(lt.size(edge_keys))
+    for i in range(lt.size(edge_keys)):
+        edge_key = lt.get_element(edge_keys, i)
+        edge_info = mp.get(catalog["edges_info"], edge_key)
+        avg_time = edge_info["total"] / edge_info["count"] if edge_info["count"] > 0 else 0
         node1, node2 = edge_key.split("|")
-        # Agregar la arista al grafo con el tiempo promedio
         gr.add_edge(catalog["graph"], node1, node2, avg_time)
+
+    end_time = get_time()
+    elapsed_time = delta_time(start_time, end_time)
+    print(f"Datos cargados en {elapsed_time:.2f} ms")
 
 
 # Funciones de consulta sobre el catálogo
