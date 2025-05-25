@@ -34,11 +34,9 @@ def load_data(control):
     file = input("Ingrese el nombre del archivo a cargar: ")
     file_path = f"Data/deliverytime_{file}.csv" 
 
-    # Llama a la lógica y obtiene la matriz de resumen
     data = lg.load_data(control, file_path)
-    print(data)
-
-
+    headers_generales = ["Total domicilios", "Total domiciliarios", "Orden", "Arcos", "# de restaurantes únicos", "# de destinos únicos", "Promedio tiempo de entrega", "Tiempo de carga de datos (ms)"]
+    print(tb.tabulate(data, headers_generales, tablefmt="pretty"))
 
 
 

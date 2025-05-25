@@ -12,7 +12,7 @@ def new_logic():
     """
     catalog = {
         # Grafo principal, donde cada nodo tendrá un mapa propio de domiciliarios
-        "graph": gr.new_graph(100000),
+        "graph": gr.new_graph(100000, 0.5),
         # Mapa para la historia de cada domiciliario (stack de entregas)
         "delivery_person_history": mp.new_map(100000, 0.5),
         # Mapa para acumular tiempos y conteos de cada arista
@@ -113,6 +113,13 @@ def load_data(catalog, filename):
                 prev_edge_info["total"] += avg_time
                 prev_edge_info["count"] += 1
 
+                #Quito el edge entre el origen y destino
+                if origin < destination:
+                    edge_key_to_remove = origin + "|" + destination
+                else:
+                    edge_key_to_remove = destination + "|" + origin
+                if mp.contains(catalog["edges_info"], edge_key_to_remove):
+                    mp.remove(catalog["edges_info"], edge_key_to_remove)
             # Guardo el domicilio actual en la historia del domiciliario (push al stack)
             st.push(history, {
                 "order_id": order_id,
@@ -131,20 +138,25 @@ def load_data(catalog, filename):
         gr.add_edge(catalog["graph"], node1, node2, avg_time)
 
     end_time = get_time()
-    elapsed_time = delta_time(start_time, end_time)
+    elapsed_time = round(delta_time(start_time, end_time),2)
 
     # Construyo la matriz de resultados como lista de listas nativa de Python
     matriz = []
-    matriz.append(["Total domicilios procesados", total_domicilios])
-    matriz.append(["Total domiciliarios identificados", mp.size(domiciliarios)])
-    matriz.append(["Total nodos en el grafo", gr.order(catalog["graph"])])
-    matriz.append(["Total arcos en el grafo", lt.size(edge_keys)])
-    matriz.append(["Total restaurantes únicos", mp.size(restaurantes)])
-    matriz.append(["Total ubicaciones destino únicas", mp.size(destinos)])
-    promedio_tiempo = total_tiempo / total_domicilios if total_domicilios > 0 else 0
-    matriz.append(["Promedio tiempo de entrega", promedio_tiempo])
+    fila = []
+    fila.append(total_domicilios)
+    fila.append(mp.size(domiciliarios))
+    fila.append(gr.order(catalog["graph"]))
+    fila.append(lt.size(edge_keys))
+    fila.append(mp.size(restaurantes))
+    fila.append(mp.size(destinos))
+    promedio_tiempo = round(total_tiempo / total_domicilios,2) if total_domicilios > 0 else 0
+    fila.append(promedio_tiempo)
+    fila.append(elapsed_time)
+    matriz.append(fila)
 
-    return matriz, elapsed_time
+    return matriz
+    #return mp.value_set(gr.adjacents(catalog["graph"],"11.1000_77.1000")) PRUEBA FUNCIONAMIENTO MIN
+
 # Funciones de consulta sobre el catálogo
 
 def get_data(catalog, id):
