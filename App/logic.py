@@ -9,6 +9,7 @@ from DataStructures.Graph import dijsktra_structure as djs
 from DataStructures.Priority_queue import priority_queue as pq
 from DataStructures.Graph import bfs
 from DataStructures.Graph import dfs
+from DataStructures.Queue import queue as q
 
 def new_logic():
     """
@@ -16,11 +17,13 @@ def new_logic():
     """
     catalog = {
         # Grafo principal, donde cada nodo tendrá un mapa propio de domiciliarios
-        "graph": gr.new_graph(100000, 0.5),
+        "graph": gr.new_graph(100000),
         # Mapa para la historia de cada domiciliario (stack de entregas)
         "delivery_person_history": mp.new_map(100000, 0.5),
         # Mapa para acumular tiempos y conteos de cada arista
-        "edges_info": mp.new_map(100000, 0.5)
+        "edges_info": mp.new_map(100000, 0.5),
+        # Mapa para restaurantes únicos (orígenes)
+        "restaurantes": mp.new_map(100000, 0.5)
     }
     return catalog
 
@@ -38,7 +41,7 @@ def load_data(catalog, filename):
     total_tiempo = 0.0
 
     # Mapa para restaurantes únicos (orígenes)
-    restaurantes = mp.new_map(100000, 0.5)
+    restaurantes = catalog["restaurantes"]
     # Mapa para ubicaciones de destino únicas
     destinos = mp.new_map(100000, 0.5)
     # Mapa para domiciliarios únicos
@@ -90,6 +93,7 @@ def load_data(catalog, filename):
                 edge_key = destination + "|" + origin
 
             # Acumulo el tiempo y el conteo para calcular el promedio después
+            
             if not mp.contains(catalog["edges_info"], edge_key):
                 mp.put(catalog["edges_info"], edge_key, {"total": 0, "count": 0})
             edge_info = mp.get(catalog["edges_info"], edge_key)
@@ -101,7 +105,7 @@ def load_data(catalog, filename):
                 mp.put(catalog["delivery_person_history"], delivery_person_id, st.new_stack())
             history = mp.get(catalog["delivery_person_history"], delivery_person_id)
 
-            if not st.is_empty(history):
+            if not st.is_empty(history): #Se asume que el domiciliario trabaja para una cadena de restaurantes
                 prev = st.top(history)
                 prev_dest = prev["destination"]
                 prev_time = prev["time_taken"]
@@ -134,6 +138,7 @@ def load_data(catalog, filename):
 
     # Al final, agrego las aristas al grafo con el tiempo promedio calculado
     edge_keys = mp.key_set(catalog["edges_info"])
+
     for i in range(lt.size(edge_keys)):
         edge_key = lt.get_element(edge_keys, i)
         edge_info = mp.get(catalog["edges_info"], edge_key)
@@ -173,88 +178,180 @@ def get_data(catalog, id):
 
 def req_1(catalog, origen, destino):
     """
-    Retorna el camino de menor tiempo entre dos ubicaciones geográficas usando Dijkstra propio.
+    Requerimiento 1: Identificar un camino simple entre dos ubicaciones geográficas usando DFS.
+    Retorna:
+      - Tiempo de ejecución (ms)
+      - Cantidad de puntos geográficos en el camino
+      - Secuencia de ubicaciones (camino simple)
+      - Ids de domiciliarios que componen el camino (sin repetir)
+      - Listado de restaurantes encontrados (ubicaciones origen en el camino)
     """
     graph = catalog["graph"]
-    # Inicializo la estructura de Dijkstra con el nodo origen y el número de nodos
-    dijkstra = djs.new_dijsktra_structure(origen, gr.order(graph))
-    # Distancia al origen es 0
-    mp.put(dijkstra["visited"], origen, 0)
-    # Insertar el origen en la cola de prioridad
-    pq.insert(dijkstra["pq"], (0, origen))
-    dijkstra["predecessors"][origen] = None
+    restaurantes = catalog["restaurantes"]  # Usamos set nativo solo para evitar repetidos en el resultado final
 
-    while dijkstra["pq"]["size"] > 0:
-        # Extraigo el nodo con menor distancia acumulada
-        actual_tuple = pq.del_min(dijkstra["pq"])
-        actual_dist, actual = actual_tuple
+    domiciliarios = mp.new_map(100, 0.5)  # Mapa para domiciliarios únicos
+    list_restaurantes = lt.new_list() # Lista para los restaurantes encontrados
+    # Medir tiempo de ejecución
+    start_time = get_time()
+
+    # Ejecutar DFS desde el origen
+    visited_map = dfs.dfs(graph, origen)
+        # Obtener el camino como stack propio
+    stack_camino = dfs.path_to(destino, visited_map)
+
+    # Verificar si hay camino hasta el destino
+    if stack_camino is None:
+        end = get_time()
+        return {
+            "tiempo_ms": round(delta_time(start_time, end), 2),
+            "cantidad_puntos": 0,
+            "camino": [],
+            "domiciliarios": [],
+            "restaurantes": []
+        }
+
+    # Convertir el stack a lista propia (de origen a destino)
+    camino = lt.new_list() #A -> B -> C
+    while not st.is_empty(stack_camino):
+        lt.add_last(camino, st.pop(stack_camino))
+
+    # Recorrer el camino para recolectar domiciliarios y restaurantes
+    for i in range(lt.size(camino)):
+        nodo = lt.get_element(camino, i)
+        node_info = gr.get_vertex_information(graph, nodo)
+
+        # Agregar todos los domiciliarios de este nodo (sin repetir)
+        delivery_map = node_info["delivery_persons"]
+        delivery_keys = mp.key_set(delivery_map)
+        for j in range(lt.size(delivery_keys)):
+            domiciliario = lt.get_element(delivery_keys, j)
+            if not mp.contains(domiciliarios, domiciliario):
+                mp.put(domiciliarios, domiciliario, True)
+
+        # Agregar a restaurantes si el nodo es un origen de algún domicilio
+        # (Puedes ajustar este criterio según tu modelo)
+        
+     
+        if mp.contains(restaurantes, nodo):
+            lt.add_last(list_restaurantes, nodo)
+
+    camino_return = ""
+    for punto in camino["elements"]:
+        camino_return += str(punto) + " -> "
+    end_time = get_time()
+    elapsed_time = round(delta_time(start_time, end_time), 2)
+
+    result  = []
+    fila = []
+    fila.append(elapsed_time)
+    fila.append(lt.size(camino))
+    fila.append(camino_return)  
+    fila.append(mp.key_set(domiciliarios)["elements"])
+    fila.append(list_restaurantes["elements"])
+    result.append(fila)
+
+    return result
+
+def bfs_domiciliario(graph, origen, destino, delivery_person_id):
+    """
+    BFS modificado: solo avanza por nodos donde el domiciliario estuvo.
+    Usa la cola propia q y retorna un visited_map con estructura:
+    {nodo: {"marked": True, "edge_to": predecesor, "dist_to": distancia}}
+    """
+    order = gr.order(graph)
+    visited_map = mp.new_map(order, 0.5)
+    # Inicializa el nodo origen en el mapa de visitados
+    mp.put(visited_map, origen, {"marked": True, "edge_to": None, "dist_to": 0})
+    queue = q.new_queue()
+    q.enqueue(queue, origen)
+    encontrado = False
+
+    while not q.is_empty(queue):
+        actual = q.dequeue(queue)
         if actual == destino:
+            encontrado = True
             break
         adyacentes = gr.adjacents(graph, actual)
         adj_keys = mp.key_set(adyacentes)
-        for j in range(lt.size(adj_keys)):
-            vecino = lt.get_element(adj_keys, j)
-            edge = mp.get(adyacentes, vecino)
-            peso = edg.get_weight(edge)
-            nueva_dist = actual_dist + peso
-            # Si no ha sido visitado o encuentro un camino más corto
-            if not mp.contains(dijkstra["visited"], vecino) or nueva_dist < mp.get(dijkstra["visited"], vecino):
-                mp.put(dijkstra["visited"], vecino, nueva_dist)
-                dijkstra["predecessors"][vecino] = actual
-                pq.insert(dijkstra["pq"], (nueva_dist, vecino))
+        for vecino in adj_keys["elements"]:
+            node_info = gr.get_vertex_information(graph, vecino)
+            delivery_map = node_info["delivery_persons"]
+            # Solo avanza si el domiciliario estuvo en el nodo vecino y no ha sido visitado
+            if mp.contains(delivery_map, delivery_person_id) and not mp.contains(visited_map, vecino):
+                actual_valor = mp.get(visited_map, actual)
+                mp.put(
+                    visited_map,
+                    vecino,
+                    {
+                        "marked": True,
+                        "edge_to": actual,
+                        "dist_to": actual_valor["dist_to"] + 1
+                    }
+                )
+                q.enqueue(queue, vecino)
 
-    # Reconstruyo el camino usando los predecesores
-    camino = lt.new_list()
-    actual = destino
-    while actual is not None:
-        lt.add_first(camino, actual)
-        actual = dijkstra["predecessors"].get(actual)
-    if not mp.contains(dijkstra["visited"], destino):
-        return None, float('inf')
-    return camino, mp.get(dijkstra["visited"], destino)
+    return visited_map, encontrado
 
 
 def req_2(catalog, origen, destino, delivery_person_id):
-    """
-    Retorna el camino con menos puntos intermedios entre dos ubicaciones
-    para un domiciliario específico usando BFS propio.
-    """
+
     graph = catalog["graph"]
-    # BFS propio usando solo nodos visitados por el domiciliario
-    visitados = mp.new_map(gr.order(graph), 0.5)
-    prev = mp.new_map(gr.order(graph), 0.5)
-    queue = lt.new_list()
+    restaurantes = catalog["restaurantes"]  
 
-    lt.add_last(queue, origen)
-    mp.put(visitados, origen, True)
-    mp.put(prev, origen, None)
+    domiciliarios = mp.new_map(100, 0.5)  # Mapa para domiciliarios únicos
+    list_restaurantes = lt.new_list()      # Lista para los restaurantes encontrados
 
-    while lt.size(queue) > 0:
-        actual = lt.get_element(queue, 0)
-        lt.remove_first(queue)
-        if actual == destino:
-            break
-        adyacentes = gr.adjacents(graph, actual)
-        adj_keys = mp.key_set(adyacentes)
-        for j in range(lt.size(adj_keys)):
-            vecino = lt.get_element(adj_keys, j)
-            node_info = gr.get_vertex_information(graph, vecino)
-            delivery_map = node_info["delivery_persons"]
-            if mp.contains(delivery_map, delivery_person_id) and not mp.contains(visitados, vecino):
-                mp.put(visitados, vecino, True)
-                mp.put(prev, vecino, actual)
-                lt.add_last(queue, vecino)
+    start_time = get_time()
 
-    # Reconstruyo el camino usando solo tus estructuras
-    camino = lt.new_list()
-    actual = destino
-    while actual is not None and mp.contains(prev, actual):
-        lt.add_first(camino, actual)
-        actual = mp.get(prev, actual)
-    # Verifico si el camino es válido
-    if lt.size(camino) == 0 or lt.get_element(camino, 0) != origen:
-        return None
-    return camino
+    visited_bfs, encontrado = bfs_domiciliario(graph, origen, destino, delivery_person_id)
+    
+    camino_o_d = bfs.path_to(destino, visited_bfs)
+    camino = lt.new_list()  # Lista para el camino encontrado
+    for point in camino_o_d["elements"]:
+        lt.add_first(camino, point)
+
+    if not encontrado or lt.size(camino) == 0 or lt.get_element(camino, 0) != origen:
+        end_time = get_time()
+        elapsed_time = round(delta_time(start_time, end_time), 2)
+        return "XXXXXXXXXXXXXXXXXXXXXX"
+
+    # Recorrer el camino para recolectar domiciliarios y restaurantes
+    for nodo in camino["elements"]:
+        node_info = gr.get_vertex_information(graph, nodo) #{"delivery_persons": mp.new_map(100, 0.5)} ID's: True
+        # Agregar todos los domiciliarios de este nodo (sin repetir)
+        delivery_map = node_info["delivery_persons"]
+        delivery_keys = mp.key_set(delivery_map)
+        for domiciliario in delivery_keys["elements"]:
+            if not mp.contains(domiciliarios, domiciliario):
+                mp.put(domiciliarios, domiciliario, True)
+        # Agregar a restaurantes si el nodo es un origen de algún domicilio
+        if mp.contains(restaurantes, nodo):
+            lt.add_last(list_restaurantes, nodo)
+
+    # Construir la secuencia del camino como string
+    camino_return = ""
+    for punto in camino["elements"]:
+        if punto == destino:
+            camino_return += str(punto) 
+        else:
+            camino_return += str(punto) + " -> "
+
+    end_time = get_time()
+    elapsed_time = round(delta_time(start_time, end_time), 2)
+
+    result = []
+    fila = []
+    fila.append(elapsed_time)
+    fila.append(lt.size(camino))
+    if len(camino_return) > 60:
+        print("\n",camino_return)
+    else:
+        fila.append(camino_return)
+    fila.append(mp.key_set(domiciliarios)["elements"])
+    fila.append(list_restaurantes["elements"])
+    result.append(fila)
+
+    return result
 
 
 def req_3(catalog):

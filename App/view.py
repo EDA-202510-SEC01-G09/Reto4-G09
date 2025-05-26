@@ -52,15 +52,44 @@ def print_req_1(control):
         Función que imprime la solución del Requerimiento 1 en consola
     """
     # TODO: Imprimir el resultado del requerimiento 1
-    pass
+
+    origen_lat = input("\nIngrese la latitud del origen del camino que busca: ")
+    origen_lon = input("Ingrese la longitud del origen del camino que busca: ")
+    destino_lat = input("Ingrese la latitud del destino del camino que busca: ")
+    destino_lon = input("Ingrese la longitud del destino del camino que busca: ")
+    origen = lg.format_node_id(origen_lat, origen_lon)
+    destino = lg.format_node_id(destino_lat, destino_lon)
+
+
+    data = lg.req_1(control, origen, destino)
+    headers = ["Tiempo de carga (ms)", "Cantidad de puntos", "Camino", "Domiciliarios", "Restaurantes"]
+    print(tb.tabulate(data, headers, tablefmt="pretty"))
+
+    
 
 
 def print_req_2(control):
     """
         Función que imprime la solución del Requerimiento 2 en consola
     """
-    # TODO: Imprimir el resultado del requerimiento 2
-    pass
+    origen_lat = input("\nIngrese la latitud del origen del camino que busca: ")
+    origen_lon = input("Ingrese la longitud del origen del camino que busca: ")
+    destino_lat = input("Ingrese la latitud del destino del camino que busca: ")
+    destino_lon = input("Ingrese la longitud del destino del camino que busca: ")
+    delivery_person_id = input("Ingrese el ID del domiciliario: ")
+    origen = lg.format_node_id(origen_lat, origen_lon)
+    destino = lg.format_node_id(destino_lat, destino_lon)
+
+    data = lg.req_2(control, origen, destino, delivery_person_id)
+    if len(data[0]) == 4:
+        print("El camino es muy largo para tabular")
+        headers = ["Tiempo de carga (ms)", "Cantidad de puntos", "Domiciliarios", "Restaurantes"]
+        print(tb.tabulate(data, headers, tablefmt="pretty"))
+    else:
+        headers = ["Tiempo de carga (ms)", "Cantidad de puntos", "Camino", "Domiciliarios", "Restaurantes"]
+        print(tb.tabulate(data, headers, tablefmt="pretty"))
+
+
 
 
 def print_req_3(control):
