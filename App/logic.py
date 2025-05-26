@@ -5,6 +5,10 @@ from DataStructures.Map import map_linear_probing as mp
 from DataStructures.List import array_list as lt
 from DataStructures.Stack import stack as st
 from DataStructures.Graph import edge as edg
+from DataStructures.Graph import dijsktra_structure as djs
+from DataStructures.Priority_queue import priority_queue as pq
+from DataStructures.Graph import bfs
+from DataStructures.Graph import dfs
 
 def new_logic():
     """
@@ -169,35 +173,21 @@ def get_data(catalog, id):
 
 def req_1(catalog, origen, destino):
     """
-    Retorna el resultado del requerimiento 1
-    """
-    # TODO: Modificar el requerimiento 1
-    pass
-
-    """
-    Retorna el camino de menor tiempo entre dos ubicaciones geográficas.
-    Usa Dijkstra sobre el grafo principal.
+    Retorna el camino de menor tiempo entre dos ubicaciones geográficas usando Dijkstra propio.
     """
     graph = catalog["graph"]
-    # Diccionario para almacenar el costo mínimo a cada nodo
-    dist = {}
-    # Diccionario para reconstruir el camino
-    prev = {}
-    # Lista de nodos por visitar (tupla: (costo acumulado, nodo))
-    import heapq
-    heap = []
+    # Inicializo la estructura de Dijkstra con el nodo origen y el número de nodos
+    dijkstra = djs.new_dijsktra_structure(origen, gr.order(graph))
+    # Distancia al origen es 0
+    mp.put(dijkstra["visited"], origen, 0)
+    # Insertar el origen en la cola de prioridad
+    pq.insert(dijkstra["pq"], (0, origen))
+    dijkstra["predecessors"][origen] = None
 
-    # Inicializo todas las distancias en infinito, excepto el origen
-    vertices = gr.vertices(graph)
-    for i in range(lt.size(vertices)):
-        node = lt.get_element(vertices, i)
-        dist[node] = float('inf')
-        prev[node] = None
-    dist[origen] = 0
-    heapq.heappush(heap, (0, origen))
-
-    while heap:
-        costo_actual, actual = heapq.heappop(heap)
+    while dijkstra["pq"]["size"] > 0:
+        # Extraigo el nodo con menor distancia acumulada
+        actual_tuple = pq.del_min(dijkstra["pq"])
+        actual_dist, actual = actual_tuple
         if actual == destino:
             break
         adyacentes = gr.adjacents(graph, actual)
@@ -206,69 +196,64 @@ def req_1(catalog, origen, destino):
             vecino = lt.get_element(adj_keys, j)
             edge = mp.get(adyacentes, vecino)
             peso = edg.get_weight(edge)
-            nuevo_costo = costo_actual + peso
-            if nuevo_costo < dist[vecino]:
-                dist[vecino] = nuevo_costo
-                prev[vecino] = actual
-                heapq.heappush(heap, (nuevo_costo, vecino))
+            nueva_dist = actual_dist + peso
+            # Si no ha sido visitado o encuentro un camino más corto
+            if not mp.contains(dijkstra["visited"], vecino) or nueva_dist < mp.get(dijkstra["visited"], vecino):
+                mp.put(dijkstra["visited"], vecino, nueva_dist)
+                dijkstra["predecessors"][vecino] = actual
+                pq.insert(dijkstra["pq"], (nueva_dist, vecino))
 
-    # Reconstruyo el camino
-    camino = []
+    # Reconstruyo el camino usando los predecesores
+    camino = lt.new_list()
     actual = destino
     while actual is not None:
-        camino.insert(0, actual)
-        actual = prev[actual]
-    if dist[destino] == float('inf'):
-        return None, float('inf')  # No hay camino
-    return camino, dist[destino]
+        lt.add_first(camino, actual)
+        actual = dijkstra["predecessors"].get(actual)
+    if not mp.contains(dijkstra["visited"], destino):
+        return None, float('inf')
+    return camino, mp.get(dijkstra["visited"], destino)
+
 
 def req_2(catalog, origen, destino, delivery_person_id):
     """
-    Retorna el resultado del requerimiento 2
-    """
-    # TODO: Modificar el requerimiento 2
-    pass
-
-
-    """
     Retorna el camino con menos puntos intermedios entre dos ubicaciones
-    para un domiciliario específico (solo por nodos donde ese domiciliario estuvo).
+    para un domiciliario específico usando BFS propio.
     """
     graph = catalog["graph"]
-    from collections import deque
+    # BFS propio usando solo nodos visitados por el domiciliario
+    visitados = mp.new_map(gr.order(graph), 0.5)
+    prev = mp.new_map(gr.order(graph), 0.5)
+    queue = lt.new_list()
 
-    # BFS clásico pero solo por nodos donde el domiciliario estuvo
-    visitados = {}
-    prev = {}
-    queue = deque()
-    queue.append(origen)
-    visitados[origen] = True
-    prev[origen] = None
+    lt.add_last(queue, origen)
+    mp.put(visitados, origen, True)
+    mp.put(prev, origen, None)
 
-    while queue:
-        actual = queue.popleft()
+    while lt.size(queue) > 0:
+        actual = lt.get_element(queue, 0)
+        lt.remove_first(queue)
         if actual == destino:
             break
         adyacentes = gr.adjacents(graph, actual)
         adj_keys = mp.key_set(adyacentes)
         for j in range(lt.size(adj_keys)):
             vecino = lt.get_element(adj_keys, j)
-            # Solo avanzar si el domiciliario estuvo en el nodo vecino
             node_info = gr.get_vertex_information(graph, vecino)
             delivery_map = node_info["delivery_persons"]
-            if mp.contains(delivery_map, delivery_person_id) and vecino not in visitados:
-                visitados[vecino] = True
-                prev[vecino] = actual
-                queue.append(vecino)
+            if mp.contains(delivery_map, delivery_person_id) and not mp.contains(visitados, vecino):
+                mp.put(visitados, vecino, True)
+                mp.put(prev, vecino, actual)
+                lt.add_last(queue, vecino)
 
-    # Reconstruyo el camino
-    camino = []
+    # Reconstruyo el camino usando solo tus estructuras
+    camino = lt.new_list()
     actual = destino
-    while actual is not None and actual in prev:
-        camino.insert(0, actual)
-        actual = prev[actual]
-    if not camino or camino[0] != origen:
-        return None  # No hay camino válido
+    while actual is not None and mp.contains(prev, actual):
+        lt.add_first(camino, actual)
+        actual = mp.get(prev, actual)
+    # Verifico si el camino es válido
+    if lt.size(camino) == 0 or lt.get_element(camino, 0) != origen:
+        return None
     return camino
 
 
