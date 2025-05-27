@@ -46,7 +46,6 @@ def dijkstra(my_graph, source):
         while not pq.is_empty(aux_structure["pq"]):
 
             current_distance, vertex, predecessor = pq.remove(aux_structure["pq"])
-
             if mp.get(aux_structure["visited"], vertex) is not None:
                 continue
             mp.put(aux_structure["visited"], vertex, current_distance)

@@ -86,6 +86,7 @@ def contains_vertex(my_graph, key_u):
     
 def adjacents(my_graph, key_u):
     vertex = lp.get(my_graph["vertices"], key_u)
+
     if vertex == None:
         raise Exception("El vertice no existe")
     else:

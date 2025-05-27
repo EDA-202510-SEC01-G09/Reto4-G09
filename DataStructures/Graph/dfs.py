@@ -9,22 +9,18 @@ from DataStructures.Graph import digraph as dg
 from DataStructures.Graph import vertex as ve
 
 def dfs(my_graph, source):
-    order = dg.order(my_graph)
-    visited_map = lp.new_map(order, 0.5)
-    value = {"marked": True, "edge_to": None}  # <-- Aquí el cambio
-    lp.put(visited_map, source, value)
-    visited_map = dfs_vertex(my_graph, source, visited_map)
+    visited_map = lp.new_map(dg.order(my_graph), 0.5)
+    _dfs_visit(my_graph, source, visited_map, None)
     return visited_map
 
-def dfs_vertex(my_graph, vertex, visited_map):
-    adjacents = lp.value_set(dg.adjacents(my_graph, vertex))
-
-    for adj in adjacents["elements"]:
-        neighbor = adj["to"]
-        visited = lp.get(visited_map, neighbor)
-        if visited is None:
-            lp.put(visited_map, neighbor, {"marked": True, "edge_to": vertex})
-            dfs_vertex(my_graph, neighbor, visited_map)
+def _dfs_visit(my_graph, vertex, visited_map, parent):
+    # Marca el nodo como visitado y guarda el padre
+    lp.put(visited_map, vertex, {"marked": True, "edge_to": parent})
+    adjacents_map = dg.adjacents(my_graph, vertex)
+    adj_keys = lp.key_set(adjacents_map)
+    for neighbor in adj_keys["elements"]:
+        if lp.get(visited_map, neighbor) is None:
+            _dfs_visit(my_graph, neighbor, visited_map, vertex)
     return visited_map
     
 def has_path_to(key_v, visited_map):

@@ -10,6 +10,8 @@ from DataStructures.Priority_queue import priority_queue as pq
 from DataStructures.Graph import bfs
 from DataStructures.Graph import dfs
 from DataStructures.Queue import queue as q
+from decimal import Decimal, ROUND_DOWN
+
 
 def new_logic():
     """
@@ -23,29 +25,32 @@ def new_logic():
         # Mapa para acumular tiempos y conteos de cada arista
         "edges_info": mp.new_map(100000, 0.5),
         # Mapa para restaurantes únicos (orígenes)
-        "restaurantes": mp.new_map(100000, 0.5)
+        "restaurantes": mp.new_map(100000, 0.5),
+        "rest_connections": mp.new_map(100000, 0.5)
     }
     return catalog
 
 def format_node_id(lat, lon):
-    # Formatea la latitud y longitud a 4 decimales y los une con "_"
-    return f"{float(lat):.4f}_{float(lon):.4f}"
+    # Corta a 4 decimales sin redondear y rellena con ceros si es necesario
+    lat_str = str(Decimal(str(lat)).quantize(Decimal('0.0001'), rounding=ROUND_DOWN))
+    lon_str = str(Decimal(str(lon)).quantize(Decimal('0.0001'), rounding=ROUND_DOWN))
+    return f"{lat_str}_{lon_str}"
 
 def load_data(catalog, filename):
     """
     Carga los datos del reto y construye el grafo y las estructuras auxiliares.
     Retorna una matriz (lista de listas nativa) con los datos solicitados para el reporte.
     """
-    # Inicializo contadores y estructuras auxiliares propias
+    import csv
+
     total_domicilios = 0
     total_tiempo = 0.0
 
-    # Mapa para restaurantes únicos (orígenes)
     restaurantes = catalog["restaurantes"]
-    # Mapa para ubicaciones de destino únicas
     destinos = mp.new_map(100000, 0.5)
-    # Mapa para domiciliarios únicos
     domiciliarios = mp.new_map(100000, 0.5)
+    # Mapa para listas de destinos actuales de cada restaurante
+    rest_connections = catalog["rest_connections"]
 
     start_time = get_time()
     with open(filename, encoding="utf-8") as file:
@@ -84,7 +89,13 @@ def load_data(catalog, filename):
                 node_info = gr.get_vertex_information(catalog["graph"], node)
                 delivery_map = node_info["delivery_persons"]
                 if not mp.contains(delivery_map, delivery_person_id):
-                    mp.put(delivery_map, delivery_person_id, True)
+                    mp.put(delivery_map, delivery_person_id, [{"vehicle type": mp.new_map(50,0.5)}, 0])
+                vehicles_map_d = mp.get(delivery_map, delivery_person_id)[0]["vehicle type"]
+                if not mp.contains(vehicles_map_d, row["Type_of_vehicle"]):
+                    mp.put(vehicles_map_d, row["Type_of_vehicle"], 0)
+                mp.get(delivery_map, delivery_person_id)[1] += 1
+                contador_vehiculo = mp.get(vehicles_map_d, row["Type_of_vehicle"])
+                mp.put(vehicles_map_d, row["Type_of_vehicle"], contador_vehiculo + 1)
 
             # Genero la clave única para la arista (no dirigida)
             if origin < destination:
@@ -93,7 +104,6 @@ def load_data(catalog, filename):
                 edge_key = destination + "|" + origin
 
             # Acumulo el tiempo y el conteo para calcular el promedio después
-            
             if not mp.contains(catalog["edges_info"], edge_key):
                 mp.put(catalog["edges_info"], edge_key, {"total": 0, "count": 0})
             edge_info = mp.get(catalog["edges_info"], edge_key)
@@ -105,11 +115,28 @@ def load_data(catalog, filename):
                 mp.put(catalog["delivery_person_history"], delivery_person_id, st.new_stack())
             history = mp.get(catalog["delivery_person_history"], delivery_person_id)
 
-            if not st.is_empty(history): #Se asume que el domiciliario trabaja para una cadena de restaurantes
+            # --- INICIO OPTIMIZACIÓN SIN SETS ---
+            # Lleva la lista de destinos actuales del restaurante
+            if origin != destination:
+                if not mp.contains(rest_connections, origin):
+                    mp.put(rest_connections, origin, lt.new_list())
+                dest_list = mp.get(rest_connections, origin)
+                # Solo agrega si no está ya en la lista
+                found = False
+                for i in range(lt.size(dest_list)):
+                    if lt.get_element(dest_list, i) == destination:
+                        found = True
+                        break
+                if not found:
+                    lt.add_last(dest_list, destination)
+                mp.put(rest_connections, origin, dest_list)
+            # --- FIN OPTIMIZACIÓN ---
+
+            if not st.is_empty(history):
                 prev = st.top(history)
                 prev_dest = prev["destination"]
                 prev_time = prev["time_taken"]
-                # Genero la clave única para la arista entre destinos consecutivos
+                # Primero agrega la arista entre destinos consecutivos
                 if prev_dest < destination:
                     prev_edge_key = prev_dest + "|" + destination
                 else:
@@ -121,13 +148,29 @@ def load_data(catalog, filename):
                 prev_edge_info["total"] += avg_time
                 prev_edge_info["count"] += 1
 
-                #Quito el edge entre el origen y destino
-                if origin < destination:
-                    edge_key_to_remove = origin + "|" + destination
-                else:
-                    edge_key_to_remove = destination + "|" + origin
-                if mp.contains(catalog["edges_info"], edge_key_to_remove):
-                    mp.remove(catalog["edges_info"], edge_key_to_remove)
+                # Luego elimina la arista restaurante-destino SOLO si el restaurante tiene más de un destino conectado
+                prev_origin = prev["origin"]
+                if prev_origin != prev_dest:
+                    # Solo si no es un loop
+                    if mp.contains(rest_connections, prev_origin):
+                        dest_list = mp.get(rest_connections, prev_origin)
+                        # Elimina prev_dest de la lista
+                        idx_to_remove = -1
+                        for i in range(lt.size(dest_list)):
+                            if lt.get_element(dest_list, i) == prev_dest:
+                                idx_to_remove = i
+                                break
+                        if idx_to_remove != -1:
+                            lt.delete_element(dest_list, idx_to_remove)
+                            mp.put(rest_connections, prev_origin, dest_list)
+                        # Solo elimina la arista si quedan otros destinos conectados
+                        if lt.size(dest_list) >= 1:
+                            if prev_origin < prev_dest:
+                                edge_key_to_remove = prev_origin + "|" + prev_dest
+                            else:
+                                edge_key_to_remove = prev_dest + "|" + prev_origin
+                            if mp.contains(catalog["edges_info"], edge_key_to_remove):
+                                mp.remove(catalog["edges_info"], edge_key_to_remove)
             # Guardo el domicilio actual en la historia del domiciliario (push al stack)
             st.push(history, {
                 "order_id": order_id,
@@ -138,14 +181,13 @@ def load_data(catalog, filename):
 
     # Al final, agrego las aristas al grafo con el tiempo promedio calculado
     edge_keys = mp.key_set(catalog["edges_info"])
-
     for i in range(lt.size(edge_keys)):
         edge_key = lt.get_element(edge_keys, i)
         edge_info = mp.get(catalog["edges_info"], edge_key)
         avg_time = edge_info["total"] / edge_info["count"] if edge_info["count"] > 0 else 0
         node1, node2 = edge_key.split("|")
-        gr.add_edge(catalog["graph"], node1, node2, avg_time)
-
+        gr.add_edge(catalog["graph"], node1, node2, round(avg_time,2))
+    print(mp.value_set(gr.adjacents(catalog["graph"], "12.3263_76.6191")))
     end_time = get_time()
     elapsed_time = round(delta_time(start_time, end_time),2)
 
@@ -165,7 +207,7 @@ def load_data(catalog, filename):
 
     return matriz
     #return mp.value_set(gr.adjacents(catalog["graph"],"11.1000_77.1000")) PRUEBA FUNCIONAMIENTO MIN
-
+    
 # Funciones de consulta sobre el catálogo
 
 def get_data(catalog, id):
@@ -186,6 +228,8 @@ def req_1(catalog, origen, destino):
       - Ids de domiciliarios que componen el camino (sin repetir)
       - Listado de restaurantes encontrados (ubicaciones origen en el camino)
     """
+
+
     graph = catalog["graph"]
     restaurantes = catalog["restaurantes"]  # Usamos set nativo solo para evitar repetidos en el resultado final
 
@@ -196,19 +240,13 @@ def req_1(catalog, origen, destino):
 
     # Ejecutar DFS desde el origen
     visited_map = dfs.dfs(graph, origen)
+
         # Obtener el camino como stack propio
     stack_camino = dfs.path_to(destino, visited_map)
 
     # Verificar si hay camino hasta el destino
     if stack_camino is None:
-        end = get_time()
-        return {
-            "tiempo_ms": round(delta_time(start_time, end), 2),
-            "cantidad_puntos": 0,
-            "camino": [],
-            "domiciliarios": [],
-            "restaurantes": []
-        }
+        return None
 
     # Convertir el stack a lista propia (de origen a destino)
     camino = lt.new_list() #A -> B -> C
@@ -237,7 +275,10 @@ def req_1(catalog, origen, destino):
 
     camino_return = ""
     for punto in camino["elements"]:
-        camino_return += str(punto) + " -> "
+        if punto == destino:
+            camino_return += str(punto)
+        else:
+            camino_return += str(punto) + " -> "
     end_time = get_time()
     elapsed_time = round(delta_time(start_time, end_time), 2)
 
@@ -311,9 +352,8 @@ def req_2(catalog, origen, destino, delivery_person_id):
         lt.add_first(camino, point)
 
     if not encontrado or lt.size(camino) == 0 or lt.get_element(camino, 0) != origen:
-        end_time = get_time()
-        elapsed_time = round(delta_time(start_time, end_time), 2)
-        return "XXXXXXXXXXXXXXXXXXXXXX"
+        # Si no se encontró un camino o el origen no es el primer punto, retornamos vacío
+        return None
 
     # Recorrer el camino para recolectar domiciliarios y restaurantes
     for nodo in camino["elements"]:
@@ -354,36 +394,195 @@ def req_2(catalog, origen, destino, delivery_person_id):
     return result
 
 
-def req_3(catalog):
+def req_3(catalog, punto_geografico):
     """
-    Retorna el resultado del requerimiento 3
+    Requerimiento 3: Identificar el domiciliario con mayor cantidad de pedidos para un punto geográfico en particular.
+    Retorna:
+      - Tiempo de ejecución (ms)
+      - ID del domiciliario más popular en ese punto
+      - Cantidad de pedidos atendidos por ese domiciliario en ese punto
+      - Tipo de vehículo que más repitió ese domiciliario en ese punto
     """
-    # TODO: Modificar el requerimiento 3
-    pass
+    start_time = get_time()
+    graph = catalog["graph"]
+
+    # Verifica si el punto existe en el grafo
+    if not gr.contains_vertex(graph, punto_geografico):
+        return None
+
+    # Obtiene el mapa de domiciliarios del nodo
+    node_info = gr.get_vertex_information(graph, punto_geografico)
+    delivery_map = node_info["delivery_persons"]
+
+    # Busca el domiciliario con más pedidos en ese punto
+    max_pedidos = 0
+    domiciliario_popular = None
+
+    delivery_keys = mp.key_set(delivery_map)
+
+    for domiciliario_id in delivery_keys["elements"]:
+        pedidos = mp.get(delivery_map, domiciliario_id)[1]  # contador de pedidos
+        if pedidos > max_pedidos:
+            max_pedidos = pedidos
+            domiciliario_popular = domiciliario_id
+
+    # Busca el tipo de vehículo más usado por ese domiciliario
+    vehiculo_mas_usado = "-"
+    if domiciliario_popular is not None:
+        vehicles_map = mp.get(delivery_map, domiciliario_popular)[0]["vehicle type"]
+        max_vehiculos = 0
+        vehiculos_keys = mp.key_set(vehicles_map)
+        for tipo in vehiculos_keys["elements"]:
+            cantidad = mp.get(vehicles_map, tipo)
+            if cantidad > max_vehiculos:
+                max_vehiculos = cantidad
+                vehiculo_mas_usado = tipo
+
+    end_time = get_time()
+    elapsed_time = round(delta_time(start_time, end_time), 2)
+
+    fila = [
+        elapsed_time,
+        domiciliario_popular,
+        max_pedidos,
+        vehiculo_mas_usado
+    ]
+    return [fila]
+
+def req_4(catalog, origen, destino):
+
+    graph = catalog["graph"]
+    start_time = get_time()
+
+    # BFS para encontrar el camino más corto (en puntos) entre origen y destino
+    visited_map = bfs.bfs(graph, origen)
+
+    # Reconstruir el camino usando el visited_map
+    camino = bfs.path_to(destino, visited_map)
+
+    if not bfs.has_path_to(destino, visited_map) or lt.size(camino) == 0 or lt.get_element(camino, 0) != destino:
+        return None
+    
+    camino_return = lt.new_list()  
+    for point in camino["elements"]:
+        lt.add_first(camino_return, point)
+
+    # Obtener los domiciliarios de cada nodo del camino
+
+    lista_domiciliarios = mp.new_map(100, 0.5)  # Mapa para domiciliarios únicos
+    numero_de_nodos = 0 #cuento los nodos, el id que tenga el mismo numero que el numero de nodos, esta en todos y es la interseccion.
+    for nodo in camino["elements"]:
+        node_info = gr.get_vertex_information(graph, nodo)
+        delivery_map = node_info["delivery_persons"]
+        delivery_keys = mp.key_set(delivery_map)
+        for delivery_person_id in delivery_keys["elements"]:
+            if not mp.contains(lista_domiciliarios, delivery_person_id):
+                mp.put(lista_domiciliarios, delivery_person_id, 0)
+            mp.put(lista_domiciliarios, delivery_person_id, mp.get(lista_domiciliarios, delivery_person_id) + 1)
+        numero_de_nodos += 1
+    
+    domiciliarios_comunes = lt.new_list()  # Lista para domiciliarios comunes
+
+    for domiciliario_id in mp.key_set(lista_domiciliarios)["elements"]:
+        if mp.get(lista_domiciliarios, domiciliario_id) == numero_de_nodos:
+            lt.add_last(domiciliarios_comunes, domiciliario_id)
+    
+    # Construir la secuencia del camino como string
+    camino_returnT = ""
+    for punto in camino_return["elements"]:
+        if punto == destino:
+            camino_returnT += str(punto) 
+        else:
+            camino_returnT += str(punto) + " -> "
+
+    end_time = get_time()
+    elapsed_time = round(delta_time(start_time, end_time), 2)
+
+    if len(camino_returnT) <= 60:
+        fila = [
+            elapsed_time,
+            camino_return,
+            domiciliarios_comunes["elements"]
+        ]
+    else:
+        print("\n",camino_returnT)
+        fila = [
+            elapsed_time,
+            domiciliarios_comunes["elements"]
+        ]
+    return [fila]
 
 
-def req_4(catalog):
+def req_6(catalog, origen):
     """
-    Retorna el resultado del requerimiento 4
+    Requerimiento 6: Identificar los caminos de costo mínimo en tiempo desde una ubicación geográfica específica.
+    Retorna:
+      - Tiempo de ejecución (ms)
+      - Cantidad de ubicaciones alcanzables (incluyendo la inicial)
+      - Identificadores de las ubicaciones alcanzables (ordenados alfabéticamente)
+      - El camino de costo mínimo con mayor tiempo total (secuencia y tiempo)
     """
-    # TODO: Modificar el requerimiento 4
-    pass
+    graph = catalog["graph"]
+    start_time = get_time()
 
+    # Inicializar estructura de Dijkstra desde el origen
 
-def req_5(catalog):
-    """
-    Retorna el resultado del requerimiento 5
-    """
-    # TODO: Modificar el requerimiento 5
-    pass
+    dijkstra = djs.dijkstra(graph, origen)
 
-def req_6(catalog):
-    """
-    Retorna el resultado del requerimiento 6
-    """
-    # TODO: Modificar el requerimiento 6
-    pass
+    #print(mp.key_set(dijkstra["visited"]))
 
+    # Recopilar ubicaciones alcanzables y encontrar la de mayor tiempo
+    ubicaciones = lt.new_list()
+    mayor_tiempo = -1
+    destino_mayor = None
+    visited_keys = mp.key_set(dijkstra["visited"])
+    for nodo in visited_keys["elements"]:
+        lt.add_last(ubicaciones, nodo)
+        tiempo = mp.get(dijkstra["visited"], nodo)
+        if tiempo > mayor_tiempo and nodo != origen:
+            mayor_tiempo = tiempo
+            destino_mayor = nodo
+    ubicaciones_ordenadas = lt.merge_sort(ubicaciones, compare_alphabetical)
+
+    # Ordenar alfabéticamente las ubicaciones alcanzables
+
+    # Reconstruir el camino de mayor tiempo
+
+    camino_a_mayor = djs.path_to(destino_mayor, dijkstra)
+
+    # Construir la secuencia del camino como string
+    camino_return = ""
+    for punto in camino_a_mayor:
+        if punto == destino_mayor:
+            camino_return += str(punto)
+        else:
+            camino_return += str(punto) + " -> "
+
+    end_time = get_time()
+    elapsed_time = round(delta_time(start_time, end_time), 2)
+
+    if len(camino_return) > 60:
+        print("\n",camino_return)
+        camino_return = "Camino muy largo para mostrar"
+        fila = [
+            elapsed_time,
+            len(ubicaciones["elements"]),
+            ubicaciones_ordenadas["elements"],
+            round(mayor_tiempo, 2) if mayor_tiempo != -1 else 0
+        ]
+    else:
+        fila = [
+            elapsed_time,
+            len(ubicaciones),
+            ubicaciones_ordenadas["elements"],
+            camino_return,
+            round(mayor_tiempo, 2) if mayor_tiempo != -1 else 0
+        ]
+    return [fila]
+
+def compare_alphabetical(a, b):
+
+    return a < b
 
 def req_7(catalog):
     """

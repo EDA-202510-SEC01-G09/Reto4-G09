@@ -8,10 +8,7 @@ import csv
 from DataStructures.List import array_list as ar
 
 def new_logic():
-    """
-        Se crea una instancia del controlador
-    """
-    #TODO: Llamar la función de la lógica donde se crean las estructuras de datos
+
     return lg.new_logic()
 
 def print_menu():
@@ -28,9 +25,7 @@ def print_menu():
     print("0- Salir")
 
 def load_data(control):
-    """
-    Carga los datos y muestra el resumen tabulado.
-    """
+
     file = input("Ingrese el nombre del archivo a cargar: ")
     file_path = f"Data/deliverytime_{file}.csv" 
 
@@ -38,20 +33,7 @@ def load_data(control):
     headers_generales = ["Total domicilios", "Total domiciliarios", "Orden", "Arcos", "# de restaurantes únicos", "# de destinos únicos", "Promedio tiempo de entrega", "Tiempo de carga de datos (ms)"]
     print(tb.tabulate(data, headers_generales, tablefmt="pretty"))
 
-
-
-def print_data(control, id):
-    """
-        Función que imprime un dato dado su ID
-    """
-    #TODO: Realizar la función para imprimir un elemento
-    pass
-
 def print_req_1(control):
-    """
-        Función que imprime la solución del Requerimiento 1 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 1
 
     origen_lat = input("\nIngrese la latitud del origen del camino que busca: ")
     origen_lon = input("Ingrese la longitud del origen del camino que busca: ")
@@ -62,16 +44,14 @@ def print_req_1(control):
 
 
     data = lg.req_1(control, origen, destino)
-    headers = ["Tiempo de carga (ms)", "Cantidad de puntos", "Camino", "Domiciliarios", "Restaurantes"]
-    print(tb.tabulate(data, headers, tablefmt="pretty"))
-
-    
-
+    if data is None:
+        print("No se encontró un camino entre los puntos dados.")
+    else:
+        headers = ["Tiempo de carga (ms)", "Cantidad de puntos", "Camino", "Domiciliarios", "Restaurantes"]
+        print(tb.tabulate(data, headers, tablefmt="pretty"))
 
 def print_req_2(control):
-    """
-        Función que imprime la solución del Requerimiento 2 en consola
-    """
+
     origen_lat = input("\nIngrese la latitud del origen del camino que busca: ")
     origen_lon = input("Ingrese la longitud del origen del camino que busca: ")
     destino_lat = input("Ingrese la latitud del destino del camino que busca: ")
@@ -81,7 +61,9 @@ def print_req_2(control):
     destino = lg.format_node_id(destino_lat, destino_lon)
 
     data = lg.req_2(control, origen, destino, delivery_person_id)
-    if len(data[0]) == 4:
+    if data is None:
+        print("No se encontró un camino entre los puntos dados.")
+    elif len(data[0]) == 4:
         print("El camino es muy largo para tabular")
         headers = ["Tiempo de carga (ms)", "Cantidad de puntos", "Domiciliarios", "Restaurantes"]
         print(tb.tabulate(data, headers, tablefmt="pretty"))
@@ -89,23 +71,42 @@ def print_req_2(control):
         headers = ["Tiempo de carga (ms)", "Cantidad de puntos", "Camino", "Domiciliarios", "Restaurantes"]
         print(tb.tabulate(data, headers, tablefmt="pretty"))
 
-
-
-
 def print_req_3(control):
-    """
-        Función que imprime la solución del Requerimiento 3 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 3
-    pass
+
+    lat = input("Ingrese la latitud del punto geográfico: ")
+    lon = input("Ingrese la longitud del punto geográfico: ")
+    punto_geografico = lg.format_node_id(lat, lon)
+
+    data = lg.req_3(control, punto_geografico)
+    if data is None:
+        print("No se encontró información para el punto geográfico dado.")
+    else:
+        headers = ["Tiempo de carga (ms)", "Domiciliario más popular", "Máximo de pedidos", "Vehículo más usado"]
+        print(tb.tabulate(data, headers, tablefmt="pretty"))
 
 
 def print_req_4(control):
-    """
-        Función que imprime la solución del Requerimiento 4 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 4
-    pass
+    
+    origen_lat = input("\nIngrese la latitud del origen del camino que busca: ")
+    origen_lon = input("Ingrese la longitud del origen del camino que busca: ")
+    destino_lat = input("Ingrese la latitud del destino del camino que busca: ")
+    destino_lon = input("Ingrese la longitud del destino del camino que busca: ")
+    origen = lg.format_node_id(origen_lat, origen_lon)
+    destino = lg.format_node_id(destino_lat, destino_lon)
+
+    data = lg.req_4(control, origen, destino)
+
+    if data is None:
+        print("No se encontró un camino entre los puntos dados.")
+
+    elif len(data[0]) == 2:
+        print("El camino es muy largo para tabular")
+        headers = ["Tiempo de carga (ms)", "Domiciliarios comunes"]
+        print(tb.tabulate(data, headers, tablefmt="pretty"))
+    else:
+        headers = ["Tiempo de carga (ms)", "Camino", "Domiciliarios comunes"]
+        print(tb.tabulate(data, headers, tablefmt="pretty"))
+
 
 
 def print_req_5(control):
@@ -118,11 +119,33 @@ def print_req_5(control):
 
 def print_req_6(control):
     """
-        Función que imprime la solución del Requerimiento 6 en consola
+    Función que imprime la solución del Requerimiento 6 en consola
     """
-    # TODO: Imprimir el resultado del requerimiento 6
-    pass
+    origen_lat = input("\nIngrese la latitud del origen: ")
+    origen_lon = input("Ingrese la longitud del origen: ")
+    origen = lg.format_node_id(origen_lat, origen_lon)
 
+    data = lg.req_6(control, origen)
+    if data is None or len(data) == 0:
+        print("No se encontraron caminos desde el punto dado.")
+    elif len(data[0]) == 4:
+        print("El camino es muy largo para tabular")
+        headers = [
+            "Tiempo de carga (ms)",
+            "Cantidad de ubicaciones alcanzables",
+            "Ubicaciones alcanzables (ordenadas)",
+            "Camino de mayor tiempo"
+        ]
+        print(tb.tabulate(data, headers, tablefmt="pretty"))
+    else:
+        headers = [
+            "Tiempo de carga (ms)",
+            "Cantidad de ubicaciones alcanzables",
+            "Ubicaciones alcanzables (ordenadas)",
+            "Camino de mayor tiempo",
+            "Tiempo total del camino"
+        ]
+        print(tb.tabulate(data, headers, tablefmt="pretty"))
 
 def print_req_7(control):
     """

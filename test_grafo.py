@@ -35,7 +35,7 @@ def test():
     gr.add_edge(grafo, 5, 2, 1)
     gr.add_edge(grafo, 5, 6, 13)
 
-    print(gr.order(grafo))
+    print(lp.value_set(dfs.dfs(grafo, 0))["elements"])
 
     
 
