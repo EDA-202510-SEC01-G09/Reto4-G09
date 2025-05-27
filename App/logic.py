@@ -41,7 +41,6 @@ def load_data(catalog, filename):
     Carga los datos del reto y construye el grafo y las estructuras auxiliares.
     Retorna una matriz (lista de listas nativa) con los datos solicitados para el reporte.
     """
-    import csv
 
     total_domicilios = 0
     total_tiempo = 0.0
@@ -94,6 +93,7 @@ def load_data(catalog, filename):
                 if not mp.contains(vehicles_map_d, row["Type_of_vehicle"]):
                     mp.put(vehicles_map_d, row["Type_of_vehicle"], 0)
                 mp.get(delivery_map, delivery_person_id)[1] += 1
+
                 contador_vehiculo = mp.get(vehicles_map_d, row["Type_of_vehicle"])
                 mp.put(vehicles_map_d, row["Type_of_vehicle"], contador_vehiculo + 1)
 
@@ -187,10 +187,10 @@ def load_data(catalog, filename):
         avg_time = edge_info["total"] / edge_info["count"] if edge_info["count"] > 0 else 0
         node1, node2 = edge_key.split("|")
         gr.add_edge(catalog["graph"], node1, node2, round(avg_time,2))
-    print(mp.value_set(gr.adjacents(catalog["graph"], "12.3263_76.6191")))
+
     end_time = get_time()
     elapsed_time = round(delta_time(start_time, end_time),2)
-
+    print(mp.value_set(gr.adjacents(catalog["graph"], "22.3105_73.1709")))
     # Construyo la matriz de resultados como lista de listas nativa de Python
     matriz = []
     fila = []

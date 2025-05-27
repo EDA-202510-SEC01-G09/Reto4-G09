@@ -94,7 +94,7 @@ def print_req_4(control):
     origen = lg.format_node_id(origen_lat, origen_lon)
     destino = lg.format_node_id(destino_lat, destino_lon)
 
-    data = lg.req_4(control, origen, destino)
+    data = lg.req_4(control, "17.4508_78.3793", "17.4608_78.3893")
 
     if data is None:
         print("No se encontró un camino entre los puntos dados.")
@@ -125,7 +125,7 @@ def print_req_6(control):
     origen_lon = input("Ingrese la longitud del origen: ")
     origen = lg.format_node_id(origen_lat, origen_lon)
 
-    data = lg.req_6(control, origen)
+    data = lg.req_6(control, "12.9753_77.6966")
     if data is None or len(data) == 0:
         print("No se encontraron caminos desde el punto dado.")
     elif len(data[0]) == 4:
