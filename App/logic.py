@@ -190,7 +190,7 @@ def load_data(catalog, filename):
 
     end_time = get_time()
     elapsed_time = round(delta_time(start_time, end_time),2)
-    print(mp.value_set(gr.adjacents(catalog["graph"], "22.3105_73.1709")))
+
     # Construyo la matriz de resultados como lista de listas nativa de Python
     matriz = []
     fila = []
@@ -584,14 +584,124 @@ def compare_alphabetical(a, b):
 
     return a < b
 
-def req_7(catalog):
+def req_7(catalog, origen, delivery_person_id):
     """
-    Retorna el resultado del requerimiento 7
+    Requerimiento 7: Árbol de recubrimiento mínimo (MST) para un domiciliario desde un punto inicial.
     """
-    # TODO: Modificar el requerimiento 7
-    pass
+    start_time = get_time()
+    graph = catalog["graph"]
 
+    # 1. Filtrar nodos donde estuvo el domiciliario
+    nodos_domiciliario = []
+    all_nodes = gr.vertices(graph)
+    for nodo in all_nodes["elements"]:
+        node_info = gr.get_vertex_information(graph, nodo)
+        delivery_map = node_info["delivery_persons"]
+        if mp.contains(delivery_map, delivery_person_id):
+            nodos_domiciliario.append(nodo)
 
+    # 2. Crear subgrafo solo con esos nodos y aristas entre ellos
+    subgrafo = gr.new_graph(len(nodos_domiciliario))
+    for nodo in nodos_domiciliario:
+        gr.insert_vertex(subgrafo, nodo, gr.get_vertex_information(graph, nodo))
+    for nodo in nodos_domiciliario:
+        adyacentes = gr.adjacents(graph, nodo)
+        adj_keys = mp.key_set(adyacentes)
+        for vecino in adj_keys["elements"]:
+            if vecino in nodos_domiciliario:
+                peso = mp.get(adyacentes, vecino)["weight"]
+                gr.add_edge(subgrafo, nodo, vecino, peso)
+
+    # 3. Ejecutar Prim desde el origen en el subgrafo
+    mst = prim_mst(subgrafo, origen)
+    mst_edges = mst["edges"]
+    mst_nodes = mst["nodes"]
+    total_tiempo = 0
+
+    for i in range(lt.size(mst_edges)):
+        edge = lt.get_element(mst_edges, i)
+        total_tiempo += edge["weight"]
+
+    # Asegurarse de incluir el nodo origen aunque no tenga aristas
+    found = False
+    for i in range(lt.size(mst_nodes)):
+        if lt.get_element(mst_nodes, i) == origen:
+            found = True
+            break
+    if not found:
+        lt.add_last(mst_nodes, origen)
+
+    # Ordenar alfabéticamente las ubicaciones
+    # Convierte mst_nodes (lista propia) a una nueva lista propia para ordenar
+    ubicaciones_lista = lt.new_list()
+    for i in range(lt.size(mst_nodes)):
+        lt.add_last(ubicaciones_lista, lt.get_element(mst_nodes, i))
+
+    ubicaciones_ordenadas = lt.merge_sort(ubicaciones_lista, compare_alphabetical)["elements"]
+
+    end_time = get_time()
+    elapsed_time = round(delta_time(start_time, end_time), 2)
+
+    fila = [
+        elapsed_time,
+        lt.size(mst_nodes),
+        ubicaciones_ordenadas,
+        round(total_tiempo, 2)
+    ]
+    return [fila]
+
+def prim_mst(graph, origen):
+    """
+    Algoritmo de Prim para Árbol de Recubrimiento Mínimo usando solo listas y mapas.
+    Usa pq.insert(heap, element) (sin prioridad explícita).
+    """
+    vertices = gr.vertices(graph)["elements"]
+    visited = mp.new_map(len(vertices), 0.5)
+    mst_edges = lt.new_list()
+    mst_nodes = lt.new_list()
+
+    # Cola de prioridad propia: (peso, desde, hasta)
+    heap = pq.new_heap(cmp_mst)
+    pq.insert(heap, (0, None, origen))  # Solo dos argumentos
+
+    while not pq.is_empty(heap):
+        peso, desde, actual = pq.remove(heap)
+        if mp.contains(visited, actual):
+            continue
+        mp.put(visited, actual, True)
+        # Solo agrega si no está ya en la lista
+        found = False
+        for i in range(lt.size(mst_nodes)):
+            if lt.get_element(mst_nodes, i) == actual:
+                found = True
+                break
+        if not found:
+            lt.add_last(mst_nodes, actual)
+        if desde is not None:
+            lt.add_last(mst_edges, {"vertexA": desde, "vertexB": actual, "weight": peso})
+        adyacentes = gr.adjacents(graph, actual)
+        adj_keys = mp.key_set(adyacentes)
+        for vecino in adj_keys["elements"]:
+            if not mp.contains(visited, vecino):
+                peso_arista = mp.get(adyacentes, vecino)["weight"]
+                pq.insert(heap, (peso_arista, actual, vecino))  # Solo dos argumentos
+
+    return {"edges": mst_edges, "nodes": mst_nodes}
+def cmp_mst(a, b):
+    """
+    Compara dos tuplas (peso, desde, hasta) para el heap del MST.
+    Retorna:
+        1  si a tiene mayor prioridad (menor peso) que b
+        0  si tienen igual peso
+        -1 si a tiene menor prioridad (mayor peso) que b
+    """
+    if a[0] < b[0]:
+        return 1
+    elif a[0] == b[0]:
+        return 0
+    else:
+        return -1
+    
 def req_8(catalog):
     """
     Retorna el resultado del requerimiento 8

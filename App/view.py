@@ -18,10 +18,8 @@ def print_menu():
     print("3- Ejecutar Requerimiento 2")
     print("4- Ejecutar Requerimiento 3")
     print("5- Ejecutar Requerimiento 4")
-    print("6- Ejecutar Requerimiento 5")
     print("7- Ejecutar Requerimiento 6")
     print("8- Ejecutar Requerimiento 7")
-    print("9- Ejecutar Requerimiento 8 (Bono)")
     print("0- Salir")
 
 def load_data(control):
@@ -43,7 +41,7 @@ def print_req_1(control):
     destino = lg.format_node_id(destino_lat, destino_lon)
 
 
-    data = lg.req_1(control, origen, destino)
+    data = lg.req_1(control, origen, destino)  
     if data is None:
         print("No se encontró un camino entre los puntos dados.")
     else:
@@ -94,7 +92,7 @@ def print_req_4(control):
     origen = lg.format_node_id(origen_lat, origen_lon)
     destino = lg.format_node_id(destino_lat, destino_lon)
 
-    data = lg.req_4(control, "17.4508_78.3793", "17.4608_78.3893")
+    data = lg.req_4(control, origen, destino)
 
     if data is None:
         print("No se encontró un camino entre los puntos dados.")
@@ -107,16 +105,6 @@ def print_req_4(control):
         headers = ["Tiempo de carga (ms)", "Camino", "Domiciliarios comunes"]
         print(tb.tabulate(data, headers, tablefmt="pretty"))
 
-
-
-def print_req_5(control):
-    """
-        Función que imprime la solución del Requerimiento 5 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 5
-    pass
-
-
 def print_req_6(control):
     """
     Función que imprime la solución del Requerimiento 6 en consola
@@ -125,7 +113,7 @@ def print_req_6(control):
     origen_lon = input("Ingrese la longitud del origen: ")
     origen = lg.format_node_id(origen_lat, origen_lon)
 
-    data = lg.req_6(control, "12.9753_77.6966")
+    data = lg.req_6(control, origen)
     if data is None or len(data) == 0:
         print("No se encontraron caminos desde el punto dado.")
     elif len(data[0]) == 4:
@@ -149,18 +137,25 @@ def print_req_6(control):
 
 def print_req_7(control):
     """
-        Función que imprime la solución del Requerimiento 7 en consola
+    Función que imprime la solución del Requerimiento 7 en consola
     """
-    # TODO: Imprimir el resultado del requerimiento 7
-    pass
+    origen_lat = input("\nIngrese la latitud del punto inicial: ")
+    origen_lon = input("Ingrese la longitud del punto inicial: ")
+    delivery_person_id = input("Ingrese el ID del domiciliario: ")
+    origen = lg.format_node_id(origen_lat, origen_lon)
 
+    data = lg.req_7(control, origen, delivery_person_id)
+    if data is None or len(data) == 0:
+        print("No se pudo construir el árbol de recubrimiento mínimo para ese domiciliario y origen.")
+    else:
+        headers = [
+            "Tiempo de ejecución (ms)",
+            "Cantidad de ubicaciones en la subred",
+            "Ubicaciones de la subred (ordenadas)",
+            "Tiempo total del árbol"
+        ]
+        print(tb.tabulate(data, headers, tablefmt="pretty"))
 
-def print_req_8(control):
-    """
-        Función que imprime la solución del Requerimiento 8 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 8
-    pass
 
 
 # Se crea la lógica asociado a la vista
@@ -191,17 +186,11 @@ def main():
         elif int(inputs) == 5:
             print_req_4(control)
 
-        elif int(inputs) == 6:
-            print_req_5(control)
-
         elif int(inputs) == 7:
             print_req_6(control)
 
         elif int(inputs) == 8:
             print_req_7(control)
-
-        elif int(inputs) == 9:
-            print_req_8(control)
 
         elif int(inputs) == 0:
             working = False
